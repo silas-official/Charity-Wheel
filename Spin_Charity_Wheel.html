@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Spin Charity Wheel</title>
+<style>
+:root{--gold:#d7a83f;--bg:#111;--panel:#191919}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(circle at 50% 35%,#292929,#090909 70%);color:#fff;font-family:system-ui,-apple-system,Segoe UI,sans-serif;display:flex;justify-content:center;align-items:center;padding:20px}
+.app{width:min(900px,100%);text-align:center}
+h1{font-size:clamp(30px,6vw,58px);margin:0 0 6px;font-weight:800}
+.sub{color:#c9c9c9;margin-bottom:18px}
+.wheel-wrap{position:relative;width:min(78vw,650px);aspect-ratio:1;margin:auto}
+canvas{width:100%;height:100%;display:block;filter:drop-shadow(0 15px 25px #000)}
+.pointer{position:absolute;z-index:3;top:-4px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:19px solid transparent;border-right:19px solid transparent;border-top:45px solid #e63b32;filter:drop-shadow(0 3px 3px #000)}
+.spin{margin-top:22px;background:linear-gradient(#e4bc58,#b77c19);border:2px solid #f4d98c;color:#17120a;font-size:22px;font-weight:900;border-radius:999px;padding:14px 42px;cursor:pointer;box-shadow:0 8px 20px #000}
+.spin:disabled{opacity:.55;cursor:not-allowed}
+.result{margin:20px auto 0;background:var(--panel);border:1px solid #8c6b29;border-radius:16px;padding:18px;max-width:650px;min-height:90px}
+.result small{color:#d7b65d;text-transform:uppercase;letter-spacing:1.5px}
+.result strong{display:block;font-size:27px;margin:5px 0}
+.result span{color:#ddd}
+.note{margin-top:12px;color:#999;font-size:13px}
+</style>
+</head>
+<body>
+<div class="app">
+<h1>🎡 Spin Charity Wheel</h1>
+<div class="sub">17 causes • one random selection</div>
+<div class="wheel-wrap">
+<div class="pointer"></div>
+<canvas id="wheel" width="900" height="900"></canvas>
+</div>
+<button class="spin" id="spin">SPIN</button>
+<div class="result" id="result"><small>Ready</small><strong>Press SPIN</strong><span>The wheel will randomly select one charity.</span></div>
+<div class="note">Every spin uses a cryptographically secure random source when available.</div>
+</div>
+<script>
+const items=[
+["Samaritan's Purse","Disaster & Emergency Relief"],
+["Compassion International","Children in Poverty"],
+["World Vision","Hunger & Food Security"],
+["World Relief","Refugee & Immigrant Assistance"],
+["International Justice Mission","Fighting Human Trafficking & Violence"],
+["Open Doors","Persecuted Christians"],
+["Wycliffe Bible Translators","Bible Translation"],
+["Prison Fellowship","Prisoners & Reentry"],
+["Water Mission","Clean Water & Sanitation"],
+["Lifeline Children's Services","Foster Care & Vulnerable Children"],
+["Buckner International","Family & Child Welfare"],
+["Acts 29","Church Planting"],
+["HeartCry Missionary Society","Supporting Missionaries"],
+["Food for the Hungry","Long-term Poverty Reduction"],
+["Medical Teams International","Emergency Medical Care"],
+["Medair","Crisis Shelter & Humanitarian Assistance"],
+["Union Gospel Mission","Homelessness & Housing Support"]
+];
+const colors=["#e43d30","#ff6b1a","#f6c515","#73d13d","#16a34a","#18b7a5","#36a9e1","#225fd2","#1646aa","#643bd0","#a63ac5","#ed4b9a","#ed2670","#df3d57","#9b6844","#777","#d1d1d1"];
+const c=document.getElementById("wheel"),ctx=c.getContext("2d"),N=items.length,arc=2*Math.PI/N;
+let angle=0,busy=false;
+
+function draw(){
+ const r=c.width/2; ctx.clearRect(0,0,c.width,c.height);
+ ctx.save();ctx.translate(r,r);
+ ctx.rotate(angle);
+ for(let i=0;i<N;i++){
+   const a=i*arc;
+   ctx.beginPath();ctx.moveTo(0,0);ctx.arc(0,0,r-12,a,a+arc);ctx.closePath();
+   ctx.fillStyle=colors[i];ctx.fill();ctx.strokeStyle="#161616";ctx.lineWidth=4;ctx.stroke();
+   ctx.save();ctx.rotate(a+arc/2);ctx.textAlign="center";ctx.fillStyle="#fff";
+   ctx.shadowColor="#000";ctx.shadowBlur=5;
+   const rr=r*.66;
+   ctx.font="800 24px system-ui";
+   const name=items[i][0];
+   const words=name.split(" ");let lines=[""];
+   for(const w of words){let t=(lines.at(-1)+" "+w).trim();if(ctx.measureText(t).width>180&&lines.at(-1))lines.push(w);else lines[lines.length-1]=t}
+   lines.slice(0,3).forEach((line,j)=>ctx.fillText(line,rr,j*28-14));
+   ctx.font="600 15px system-ui";ctx.fillText("• "+items[i][1],rr,76);
+   ctx.restore();
+ }
+ ctx.beginPath();ctx.arc(0,0,115,0,2*Math.PI);ctx.fillStyle="#111";ctx.fill();ctx.strokeStyle="#d7a83f";ctx.lineWidth=8;ctx.stroke();
+ ctx.fillStyle="#f3d27a";ctx.font="900 28px system-ui";ctx.textAlign="center";ctx.fillText("SPIN",0,10);
+ ctx.restore();
+}
+draw();
+
+function secureRandom(){
+ const a=new Uint32Array(1);
+ if(crypto.getRandomValues){crypto.getRandomValues(a);return a[0]/4294967296}
+ return Math.random();
+}
+function spin(){
+ if(busy)return; busy=true; document.getElementById("spin").disabled=true;
+ const winner=Math.floor(secureRandom()*N);
+ const centerTarget=-(winner*arc+arc/2);
+ let delta=((centerTarget-angle)%(2*Math.PI)+2*Math.PI)%(2*Math.PI);
+ const turns=7+Math.floor(secureRandom()*4);
+ const start=angle,end=angle+turns*2*Math.PI+delta,dur=5200;
+ const t0=performance.now();
+ function frame(t){
+   const p=Math.min(1,(t-t0)/dur),e=1-Math.pow(1-p,4);
+   angle=start+(end-start)*e;draw();
+   if(p<1)requestAnimationFrame(frame);else{
+     angle=end%(2*Math.PI);draw();
+     document.getElementById("result").innerHTML=`<small>Wheel landed on</small><strong>#${winner+1} — ${items[winner][0]}</strong><span>${items[winner][1]}</span>`;
+     busy=false;document.getElementById("spin").disabled=false;
+   }
+ }
+ requestAnimationFrame(frame);
+}
+document.getElementById("spin").addEventListener("click",spin);
+</script>
+</body>
+</html>
